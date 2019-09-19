@@ -3,6 +3,9 @@ package com.tor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.math.BigInteger
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 
 fun main(args: Array<String>) {
@@ -66,18 +69,45 @@ private fun parseolx(url: String): Set<ListItem> {
 //        .referrer("http://www.google.com")
         .get();
     getRezult.select("table[data-id]").forEach {
-        links.add(
-            ListItem(
-                it.attr("data-id").toBigInteger(),
-                it.select("""p[class^="price"]""").text().trimEnd('$').replace(" ", "").toIntOrNull(),
-                it.select("tbody>tr>td.bottom-cell>div.space.rel>p.lheight16>small.breadcrumb.x-normal>span")[0].text(),
-                it.select("tbody>tr>td.title-cell>div.space.rel>h3.lheight22.margintop5").text(),
-                it.select("tbody>tr>td.bottom-cell>div.space.rel>p.lheight16>small.breadcrumb.x-normal>span")[1].text()
+        val datetimeStr =
+            it.select("tbody>tr>td.bottom-cell>div.space.rel>p.lheight16>small.breadcrumb.x-normal>span")[1].text()
+
+        when {
+            datetimeStr.contains("Сегодня") || datetimeStr.contains("Вчера") -> links.add(
+                ListItem(
+                    it.attr("data-id").toBigInteger(),
+                    it.select("""p[class^="price"]""").text().trimEnd('$').replace(" ", "").toIntOrNull(),
+                    it.select("tbody>tr>td.bottom-cell>div.space.rel>p.lheight16>small.breadcrumb.x-normal>span")[0].text(),
+                    it.select("tbody>tr>td.title-cell>div.space.rel>h3.lheight22.margintop5").text(),
+                    datetimeStr.getLocalDateTime()
+                )
             )
-        )
+        }
     }
     println(url + "," + links.size)
     return links
+}
+
+fun String.getLocalDateTime(): LocalDateTime {
+    val from = this
+    var string = "Сегодня"
+    val str1 = "Сегодня"
+    val str2 = "Вчера"
+    var now = LocalDateTime.now()
+    if (from.contains(string)) {
+        string = str1
+    } else {
+        string = str2
+        now = now.minusDays(1)
+    }
+    val timeStr = from.substring(from.lastIndexOf(string) + string.length, from.length)
+    val timeL  :LocalTime = try {
+        LocalTime.parse(timeStr.trim(), DateTimeFormatter.ISO_TIME)
+    } catch (e: Exception) {
+       System.err.println(from + e)
+        LocalTime.now()
+    }
+    return now.withHour(timeL.hour).withMinute(timeL.minute)
 }
 
 fun getPhoneToken(doc: Document): CharSequence {
@@ -91,12 +121,18 @@ fun getPhoneId(doc: Document): CharSequence {
     return str.subSequence(str.indexOf("'id':'") + 6, str.lastIndexOf("'"))
 }
 
-private fun parseUserID(url: String): String = """https?://.*ID(.*?)\.html.*""".toRegex().findAll(url).joinToString()
+private fun parseUserIDinURL(url: String): String = """https?://.*ID(.*?)\.html.*""".toRegex().findAll(url).joinToString()
 
 private fun parsePhones(responseBody: String): String =
     """([\d\+\(][\d\s\-\(\)]+\d)""".toRegex().findAll(responseBody).joinToString()
 
-data class ListItem(val id: BigInteger, val price: Int?, val district: String, val header: String, val time: String) {
+data class ListItem(
+    val id: BigInteger,
+    val price: Int?,
+    val district: String,
+    val header: String,
+    val time: LocalDateTime
+) {
     fun toTSV(): String {
         return id.toString() + "\t" + district + "\t" + header + "\t" + price + "\t" + time
     }
