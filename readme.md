@@ -2,6 +2,8 @@
 
 - [start Kotlin maven](https://kotlinlang.org/docs/reference/using-maven.html)
 - add **Jsoup**
+- https://replace.org.ua/topic/8348/
+
 
 #### Комбинации Selector
 |Selector | Описание |
